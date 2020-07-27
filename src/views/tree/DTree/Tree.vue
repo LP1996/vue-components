@@ -214,9 +214,7 @@ export default {
     }
   },
   mounted() {
-    console.time('t----------------');
     const data = this.flatten(this.data);
-    console.timeEnd('t----------------');
     console.log(data.length);
     this.flattenedNodes = data;
     this.filterFlattenedNodes();
@@ -254,6 +252,7 @@ export default {
     },
 
     /* events */
+    // node-click
     handleNodeClick(flattenedNode) {
       const { isLeaf, originNode } = flattenedNode;
       flattenedNode.selected = true;
@@ -273,6 +272,7 @@ export default {
       this.handleProcessNodeExpandOrCollapse(flattenedNode);
     },
 
+    // expand-icon click
     handleProcessNodeExpandOrCollapse(flattenedNode) {
       const { expanded, children, originNode } = flattenedNode;
       console.log('expand', expanded);
@@ -348,6 +348,7 @@ export default {
       this.traverseParent(flattenedNode.parent, fn);
     },
 
+    // filter nodes
     filterFlattenedNodes() {
       const { flattenedNodes } = this;
       const filteredNodes = [];
@@ -364,6 +365,7 @@ export default {
       this.filteredNodes = filteredNodes;
     },
 
+    /* flat tree to array */
     flatten(tree) {
       const stack = tree.map(node => {
         return { originNode: node, parent: null, level: 0 }
@@ -462,6 +464,102 @@ export default {
       flattenedNode.isLeaf = computedChildren && computedChildren.length ? false : (isLazyLoad ? isLeafInner : true);
 
       return flattenedNode;
+    },
+
+    /* methods to expose */
+    setCheckedKeys(keys, leafonly = false) {
+      if (!keys || !Array.isArray(keys) || !this.nodeKey) {
+        return;
+      }
+
+      const keyMap = keys.reduce((map, key) => {
+        map[key] = 1;
+        return map;
+      }, {});
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+        const canSet = leafonly ? flattenedNode.isLeaf : true;
+
+        if (canSet && keyMap[flattenedNode.key]) {
+          flattenedNode.checked = true;
+          flattenedNode.indeterminate = false;
+          this.handleNodeCheckChange(flattenedNode, true);
+        }
+      }
+    },
+
+    setCheckedNodes(nodes) { 
+      if (!nodes || !Array.isArray(nodes) || !this.nodeKey) {
+        return;
+      }
+
+      const keys = nodes.map(node => node[this.nodeKey]);
+
+      this.setCheckedKeys(keys);
+    },
+
+    getCheckedKeys(leafonly = false) {
+      if (!this.nodeKey) {
+        return [];
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+      const checkedKeys = [];
+
+      for (let i = 0; i < len; i++) {
+        const { key, checked, isLeaf } = flattenedNodes[i];
+        const canGet = leafonly ? isLeaf : true;
+
+        canGet && checked && checkedKeys.push(key);
+      }
+
+      return checkedKeys;
+    },
+
+    getCheckedNodes(leafonly = false) {
+      if (!this.nodeKey) {
+        return [];
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+      const checkedNodes = [];
+
+      for (let i = 0; i < len; i++) {
+        const { originNode, checked, isLeaf } = flattenedNodes[i];
+        const canGet = leafonly ? isLeaf : true;
+
+        canGet && checked && checkedNodes.push(originNode);
+      }
+
+      return checkedNodes;
+    },
+
+    setChecked(keyOrData, checked, deep = false) {
+      if (!keyOrData || !this.nodeKey) {
+        return;
+      }
+
+      const isData = typeof keyOrData === 'object';
+      const key = isData ? keyOrData[this.nodeKey] : keyOrData;
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        if (flattenedNode.key === key) {
+          flattenedNode.checked = checked;
+          flattenedNode.indeterminate = false;
+  
+          deep && this.handleNodeCheckChange(flattenedNode, checked);
+          break;
+        }
+      }
     }
   }
 }

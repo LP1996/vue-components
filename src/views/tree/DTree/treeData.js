@@ -5,26 +5,26 @@ const treeData = [
     children: [
       { id: 2, name: '0-1-1' },
       { 
-        id: 2, 
+        id: 3, 
         name: '0-1-2', 
-        children: [{ id: 3, name: '1-2-1' }]
+        children: [{ id: 4, name: '1-2-1' }]
       },
-      { id: 4, name: '0-1-3' },
+      { id: 5, name: '0-1-3' },
     ]
   },
   {
-    id: 5,
+    id: 6,
     name: '0-2',
     children: [
-      { id: 6, name: '0-2-1' },
-      { id: 7, name: '0-2-2' },
-      { id: 8, name: '0-2-3' }
+      { id: 7, name: '0-2-1' },
+      { id: 8, name: '0-2-2' },
+      { id: 9, name: '0-2-3' }
     ]
   }
 ];
 
 const stack = [...treeData];
-let startId = 9;
+let startId = 10;
 
 while (stack.length) {
   const node = stack.shift();

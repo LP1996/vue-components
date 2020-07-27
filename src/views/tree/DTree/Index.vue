@@ -1,5 +1,12 @@
 <template>
-  <d-tree :data="treeData" :height="600" :node-height="20" :props="props" show-checkbox />
+  <d-tree
+    :data="treeData"
+    :height="600"
+    :node-height="20"
+    :props="props"
+    node-key="id"
+    show-checkbox
+  />
 </template>
 
 <script>
