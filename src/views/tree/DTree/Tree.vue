@@ -31,6 +31,9 @@
           @change="handleNodeCheckChange(node, $event)"
         />
 
+        <!-- lazy loading -->
+        <span v-if="node.loading" class="d-tree-node__loading-icon el-icon-loading"></span>
+
         <!-- content -->
         <span class="d-tree-node__content">
           {{ node.label }}
@@ -140,6 +143,10 @@ export default {
     load: {
       type: Function
     },
+    lazy: {
+      type: Boolean,
+      default: false
+    },
     defaultExpandAll: {
       type: Boolean,
       default: false
@@ -185,7 +192,7 @@ export default {
   },
   computed: {
     isLazyLoad() {
-      return this.load && typeof this.load === 'function';
+      return this.lazy && this.load && typeof this.load === 'function';
     },
     treeWrapperStyle() {
       const { height } = this;
@@ -269,13 +276,50 @@ export default {
         return;
       }
 
+      // 没有子节点的时候才触发懒加载
+      if (this.isLazyLoad && (!flattenedNode.children || !flattenedNode.children.length)) {
+        this.handleLazyLoad(flattenedNode);
+        return;
+      }
+
       this.handleProcessNodeExpandOrCollapse(flattenedNode);
+    },
+
+    handleLazyLoad(flattenedNode) {
+      flattenedNode.loading = true;
+
+      const resolve = data => {
+        flattenedNode.loading = false;
+        flattenedNode.loaded = true;
+
+        // 没加载到数据则表明是叶子节点
+        !data.length && (flattenedNode.isLeaf = true);
+
+        // 将数据变为 node
+        const flattenedNodes = this.flatten(data);
+
+        // TODO: 优化代码
+        // 加载的数据是可见的
+        flattenedNodes.forEach(node => {
+          node.visible = true;
+          node.level = flattenedNode.level + 1;
+        });
+
+        // 建立和当前 node 的联系，并且添加到组件的节点数组中
+        flattenedNode.children = flattenedNodes;
+        const index = this.flattenedNodes.findIndex(node => node === flattenedNode) + 1;
+        this.flattenedNodes.splice(index, 0, ...flattenedNodes);
+
+        // 处理节点的展开收缩
+        this.handleProcessNodeExpandOrCollapse(flattenedNode);
+      };
+
+      this.load(flattenedNode.originNode, resolve);
     },
 
     // expand-icon click
     handleProcessNodeExpandOrCollapse(flattenedNode) {
       const { expanded, children, originNode } = flattenedNode;
-      console.log('expand', expanded);
       const targetExpanded = !expanded;
       flattenedNode.expanded = targetExpanded;
       if (children) {
@@ -433,6 +477,8 @@ export default {
         indeterminate: false,
         filtered: false,
         selected: false,
+        loading: false,
+        loaded: false
       };
 
       const computedLabel = typeof label === 'function' ? label(originNode, flattenedNode) : originNode[label];
@@ -608,6 +654,12 @@ export default {
     color: transparent;
     cursor: default;
   }
+}
+
+.d-tree-node__loading-icon {
+  margin-right: 8px;
+  font-size: 14px;
+  color: #c0c4cc;
 }
 
 .d-tree-node__content {

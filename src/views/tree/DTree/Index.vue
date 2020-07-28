@@ -4,8 +4,10 @@
     :height="600"
     :node-height="20"
     :props="props"
+    :load="handleLazyLoad"
     node-key="id"
     show-checkbox
+    lazy
   />
 </template>
 
@@ -23,6 +25,13 @@ export default {
         label: 'name',
         children: 'children'
       }
+    }
+  },
+  methods: {
+    handleLazyLoad(_, resolve) {
+      setTimeout(() => {
+        resolve([{ id: 9999999, name: 'test' }]);
+      }, 1000);
     }
   }
 }
