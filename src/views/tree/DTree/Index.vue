@@ -5,6 +5,7 @@
     :node-height="20"
     :props="props"
     :load="handleLazyLoad"
+    :filter-node-method="filterMethod"
     node-key="id"
     show-checkbox
     lazy
@@ -32,6 +33,9 @@ export default {
       setTimeout(() => {
         resolve([{ id: 9999999, name: 'test' }]);
       }, 1000);
+    },
+    filterMethod(val, data) {
+      return data.name.includes(val);
     }
   }
 }

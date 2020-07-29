@@ -176,6 +176,9 @@ export default {
     indent: {
       type: Number,
       default: 16
+    },
+    filterNodeMethod: {
+      type: Function
     }
   },
   data() {
@@ -187,7 +190,8 @@ export default {
       startIndex: 0,
       endIndex: 0,
       visibleCount: 0,
-      selectedNode: null
+      selectedNode: null,
+      isFiltering: false
     }
   },
   computed: {
@@ -537,7 +541,7 @@ export default {
       }
     },
 
-    setCheckedNodes(nodes) { 
+    setCheckedNodes(nodes) {
       if (!nodes || !Array.isArray(nodes) || !this.nodeKey) {
         return;
       }
@@ -606,6 +610,141 @@ export default {
           break;
         }
       }
+    },
+
+    getHalfCheckedNodes() {
+      if (!this.showCheckbox) {
+        return [];
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+      const results = [];
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        if (flattenedNode.indeterminate) {
+          results.push(flattenedNode);
+        }
+      }
+
+      return results;
+    },
+
+    getHalfCheckedKeys() {
+      if (!this.showCheckbox || !this.nodeKey) {
+        return [];
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+      const results = [];
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        if (flattenedNode.indeterminate) {
+          results.push(flattenedNode.key);
+        }
+      }
+
+      return results;
+    },
+
+    getCurrentKey() {
+      if (!this.nodeKey) {
+        return null;
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        if (flattenedNode.selected) {
+          return flattenedNode.key;
+        }
+      }
+
+      return null;
+    },
+
+    getCurrentNode() {
+      if (!this.nodeKey) {
+        return null;
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        if (flattenedNode.selected) {
+          return flattenedNode.originNode;
+        }
+      }
+
+      return null;
+    },
+
+    setCurrentKey(key) {
+      if (!this.nodeKey) {
+        return;
+      }
+
+      if (key === null) {
+        this.selectedNode.selected = false;
+        return;
+      }
+
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        flattenedNode.selected = false;
+
+        if (key === flattenedNode.key) {
+          flattenedNode.selected = true;
+        }
+      }
+    },
+
+    setCurrentNode(node) {
+      if (!this.nodeKey || node === undefined) {
+        return;
+      }
+
+      const key = node[this.nodeKey] || null;
+      this.setCurrentKey(key);
+    },
+
+    filter(val) {
+      if (!this.filterNodeMethod) {
+        return;
+      }
+
+      const { flattenedNodes, filterNodeMethod } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const flattenedNode = flattenedNodes[i];
+
+        // true 表示该节点可以显示
+        const canShow = filterNodeMethod(val, flattenedNode.originNode, flattenedNode);
+        !canShow && (flattenedNode.visible = false);
+      }
+
+      this.filterFlattenedNodes();
+    },
+
+    updateKeyChildren() {
+      // 感觉很鸡肋的方法，暂不实现
+      return;
     }
   }
 }
