@@ -1,6 +1,11 @@
 <template>
   <div ref="wrapper" class="d-tree" :style="treeWrapperStyle" @scroll="onScroll">
     <div ref="phantom" class="d-tree-phantom"></div>
+    <template v-if="!filteredNodes.length">
+      <slot name="empty">
+        <div class="d-tree-empty" :style="{ lineHeight: `${treeWrapperHeight}px` }">{{ emptyText || '暂无数据' }}</div>
+      </slot>
+    </template>
     <div ref="nodesWrapper" class="d-tree-nodes">
       <div
         v-for="node in showData"
@@ -78,44 +83,6 @@ function alignScrollTop(scrollTop, scrollRange) {
   return scrollTop;
 }
 
-// eslint-disable-next-line
-function getScrollPercentage(scrollTop, clientHeight, scrollHeight) {
-  if (scrollHeight <= clientHeight) {
-    return 0;
-  }
-
-  const scrollRange = scrollHeight - clientHeight;
-  const alignedScrollTop = alignScrollTop(scrollTop, scrollRange);
-  return alignedScrollTop / scrollRange;
-}
-
-function getLocationItem(scrollPtg, total) {
-  const itemIndex = Math.floor(scrollPtg * total);
-  const itemTopPtg = itemIndex / total;
-  const itemBottomPtg = (itemIndex + 1) / total;
-  const itemOffsetPtg = (scrollPtg - itemTopPtg) / (itemBottomPtg - itemTopPtg);
-
-  return {
-    index: itemIndex,
-    offsetPtg: itemOffsetPtg
-  };
-}
-
-// eslint-disable-next-line
-function getRangeIndex(scrollPtg, total, visibleCount) {
-  const { index, offsetPtg } = getLocationItem(scrollPtg, total);
-
-  const beforeCount = Math.ceil(scrollPtg * visibleCount);
-  const afterCount = Math.ceil((1 - scrollPtg) * visibleCount);
-
-  return {
-    itemIndex: index,
-    itemOffsetPtg: offsetPtg,
-    startIndex: Math.max(0, index - beforeCount),
-    endIndex: Math.min(total - 1, index + afterCount)
-  };
-}
-
 export default {
   name: 'DTree',
   props: {
@@ -179,6 +146,9 @@ export default {
     },
     filterNodeMethod: {
       type: Function
+    },
+    emptyText: {
+      type: String
     }
   },
   data() {
@@ -258,6 +228,7 @@ export default {
 
     setDOMRelated() {
       const { nodeHeight, filteredNodes } = this;
+      console.log(filteredNodes.length);
       const scrollHeight = nodeHeight * filteredNodes.length;
       this.$refs.phantom.style.height = `${scrollHeight}px`;
     },
@@ -265,7 +236,7 @@ export default {
     /* events */
     // node-click
     handleNodeClick(flattenedNode) {
-      const { isLeaf, originNode } = flattenedNode;
+      const { isLeaf, originNode, hasFilteredChildren } = flattenedNode;
       flattenedNode.selected = true;
 
       if (this.selectedNode && this.selectedNode !== flattenedNode) {
@@ -276,7 +247,7 @@ export default {
 
       this.$emit('node-click', originNode, flattenedNode);
 
-      if (isLeaf || !this.expandOnClickNode) {
+      if (isLeaf || !this.expandOnClickNode || (this.isFiltering && !hasFilteredChildren)) {
         return;
       }
 
@@ -340,7 +311,14 @@ export default {
       const { children } = flattenedNode;
 
       if (children) {
-        children.forEach(node => node.visible = true);
+        this.traverseChildren(flattenedNode, childNode => {
+          childNode.visible = true;
+
+          if (!childNode.expanded) {
+            // 终止遍历该节点的子节点
+            return true;
+          }
+        });
       }
     },
 
@@ -349,11 +327,6 @@ export default {
     },
 
     handleNodeCheckChange(flattenedNode, checked) {
-      const { isLeaf } = flattenedNode;
-
-      if (isLeaf) {
-        return;
-      }
 
       this.traverseChildren(
         flattenedNode,
@@ -367,7 +340,7 @@ export default {
         flattenedNode,
         parentNode => {
           const isAllChecked = parentNode.children.every(({ checked }) => checked);
-          const hasChecked = parentNode.children.some(({ checked }) => checked);
+          const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
 
           parentNode.checked = isAllChecked;
           parentNode.indeterminate = hasChecked && !isAllChecked;
@@ -381,8 +354,8 @@ export default {
       }
 
       flattenedNode.children.forEach(childNode => {
-        fn(childNode);
-        this.traverseChildren(childNode, fn)
+        const val = fn(childNode);
+        !val && this.traverseChildren(childNode, fn)
       });
     },
 
@@ -391,9 +364,22 @@ export default {
         return;
       }
 
-      fn(flattenedNode.parent);
+      const val = fn(flattenedNode.parent);
+      !val && this.traverseParent(flattenedNode.parent, fn);
+    },
 
-      this.traverseParent(flattenedNode.parent, fn);
+    traverseFlattenedNodes(fn) {
+      const { flattenedNodes } = this;
+      const len = flattenedNodes.length;
+
+      for (let i = 0; i < len; i++) {
+        const val = fn(flattenedNodes[i]);
+
+        // 有返回值直接跳出
+        if (val) {
+          return;
+        }
+      }
     },
 
     // filter nodes
@@ -406,6 +392,9 @@ export default {
         const node = flattenedNodes[i];
 
         if (node.visible) {
+          if (this.isFiltering && !node.filtered) {
+            continue;
+          }
           filteredNodes.push(node);
         }
       }
@@ -480,6 +469,7 @@ export default {
         checked,
         indeterminate: false,
         filtered: false,
+        hasFilteredChildren: false,
         selected: false,
         loading: false,
         loaded: false
@@ -728,6 +718,18 @@ export default {
         return;
       }
 
+      if (val === '' || val === undefined) {
+        this.isFiltering = false;
+        this.traverseFlattenedNodes(flattenedNode => {
+          flattenedNode.expanded = true;
+          flattenedNode.visible = true;
+          flattenedNode.filtered = false;
+          flattenedNode.hasFilteredChildren = false;
+        });
+        return;
+      }
+
+      this.isFiltering = true;
       const { flattenedNodes, filterNodeMethod } = this;
       const len = flattenedNodes.length;
 
@@ -736,10 +738,21 @@ export default {
 
         // true 表示该节点可以显示
         const canShow = filterNodeMethod(val, flattenedNode.originNode, flattenedNode);
-        !canShow && (flattenedNode.visible = false);
+        flattenedNode.visible = canShow;
+        flattenedNode.filtered = canShow;
+
+        if (canShow) {
+          this.traverseParent(flattenedNode, parentNode => {
+            parentNode.expanded = true;
+            parentNode.visible = true;
+            parentNode.filtered = true;
+            parentNode.hasFilteredChildren = true;
+          });
+        }
       }
 
       this.filterFlattenedNodes();
+      this.setDOMRelated();
     },
 
     updateKeyChildren() {
@@ -759,6 +772,12 @@ export default {
   overflow: auto;
   position: relative;
   height: 100%;
+}
+
+.d-tree-empty {
+  height: 100%;
+  font-size: 14px;
+  color: #aaa;
 }
 
 .d-tree-nodes {

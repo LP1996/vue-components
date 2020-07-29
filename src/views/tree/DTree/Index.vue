@@ -1,15 +1,24 @@
 <template>
-  <d-tree
-    :data="treeData"
-    :height="600"
-    :node-height="20"
-    :props="props"
-    :load="handleLazyLoad"
-    :filter-node-method="filterMethod"
-    node-key="id"
-    show-checkbox
-    lazy
-  />
+  <section>
+    <el-input v-model="filterText" />
+
+    <d-tree
+      ref="tree"
+      :data="treeData"
+      :height="600"
+      :node-height="20"
+      :props="props"
+      :load="handleLazyLoad"
+      :filter-node-method="filterMethod"
+      node-key="id"
+      show-checkbox
+      empty-text="就没数据了~"
+    >
+      <template v-slot:empty>
+        <span>没有数据，难受</span>
+      </template>
+    </d-tree>
+  </section>
 </template>
 
 <script>
@@ -22,10 +31,16 @@ export default {
   data() {
     return {
       treeData: data,
+      filterText: '',
       props: {
         label: 'name',
         children: 'children'
       }
+    }
+  },
+  watch: {
+    filterText(newVal) {
+      this.$refs.tree.filter(newVal);
     }
   },
   methods: {
