@@ -46,7 +46,7 @@
           v-model="node.checked"
           :indeterminate="node.indeterminate"
           class="mr10"
-          :disabled="node.disabled"
+          @click.stop
           @change="handleNodeCheckChange(node, $event)"
         />
 
@@ -87,6 +87,7 @@ function throttle(fn, interval = 30, context) {
 }
 
 // 根据当前的 scrollTop 与 最大 scrollTop 对比，计算出正确的 scrollTop 值
+// eslint-disable-next-line
 function alignScrollTop(scrollTop, scrollRange) {
   if (scrollTop < 0) {
     return 0;
@@ -229,18 +230,27 @@ export default {
     this.visibleCount = Math.ceil(this.treeWrapperHeight / this.nodeHeight);
     this.setDOMRelated();
     this.onScroll();
+
+    if (this.defaultCheckedKeys && this.defaultCheckedKeys.length) {
+      this.setCheckedKeys(this.defaultCheckedKeys);
+    }
   },
   methods: {
     onScroll: throttle(function onScroll() {
       const { $refs: { wrapper: { scrollTop: originScrollTop, scrollHeight } }, treeWrapperHeight } = this;
       const scrollTop = alignScrollTop(originScrollTop, scrollHeight - treeWrapperHeight);
+      this.scrollTop = scrollTop;
       this.$refs.nodesWrapper.style.transform = `translateY(${scrollTop}px)`;
       this.changeIndex();
     }),
 
     changeIndex() {
-      const { $refs: { wrapper: { scrollTop: originScrollTop } }, visibleCount } = this;
-      const startIndex = Math.floor(originScrollTop / this.nodeHeight);
+      const { $refs: { wrapper: { scrollTop, scrollHeight } }, visibleCount, treeWrapperHeight } = this;
+
+      // TODO: 虚拟滚动重写
+      // 防止最后一个元素不停滚动问题
+      const isOverflow = scrollTop > (scrollHeight - treeWrapperHeight);
+      const startIndex = Math.floor(scrollTop / this.nodeHeight) + (isOverflow ? 1 : 0);
       const endIndex = startIndex + visibleCount;
       this.startIndex = startIndex;
       this.endIndex = endIndex;
@@ -348,53 +358,11 @@ export default {
 
     handleNodeCheckChange(flattenedNode, checked) {
       if (!this.checkStrictly) {
-        flattenedNode.indeterminate = false;
-        // 如果所有子节点都是 disabled 状态，则该节点不允许选中
-        // 如果孙子节点有不是 disabled 状态的，但是子节点全是 disabled 状态的，该节点也不允许选中
         this.traverseChildren(
           flattenedNode,
           childNode => {
-            if (childNode.isLeaf || !childNode.children.length) {
-              childNode.checked = checked;
-              childNode.indeterminate = false;
-              return;
-            }
-
-            const [disabledCount, disabledChecked] = childNode.children.reduce((count, subChildNode) => {
-              subChildNode.disabled && count[0]++;
-              subChildNode.disabled && subChildNode.checked && count[1]++;
-              return count;
-            }, [0, 0]);
-
-            const allDisabled = disabledCount === childNode.children.length;
-            const hasDisabled = disabledCount > 0 && disabledCount < childNode.children.length;
-            const noDisabled = disabledCount === 0;
-
-            // 所有子节点都是 disabled 状态则直接返回，不需要再处理孙子节点
-            if (allDisabled) {
-              childNode.checked = false;
-              childNode.indeterminate = false;
-              return true;
-            }
-
-            if (hasDisabled) {
-              childNode.checked = false;
-              childNode.indeterminate = disabledChecked !== 0;
-              return;
-            }
-
-            // TODO: 处理子节点的回溯，子节点有 indeterminate，需要回溯到这里改变父节点的状态
-            childNode.checked = true;
+            childNode.checked = checked;
             childNode.indeterminate = false;
-            // if (!childNode.disabled) {
-            //   childNode.checked = checked;
-            //   childNode.indeterminate = false;
-            // } else {
-            //   childNode.disabled && !childNode.checked && this.traverseParent(childNode, parentNode => {
-            //     parentNode.checked = false;
-            //     parentNode.indeterminate = true;
-            //   });
-            // }
           }
         );
 
@@ -412,30 +380,33 @@ export default {
         flattenedNode.indeterminate = false;
       }
 
-      this.$emit('check', flattenedNode.originNode, {
-        checkedNodes: this.getCheckedNodes(),
-        checkedKeys: this.getCheckedKeys(),
-        halfCheckedNodes: this.getHalfCheckedNodes(),
-        halfCheckedKeys: this.getHalfCheckedKeys()
-      });
-
-      let hasChildrenChecked = false;
-
-      if (!flattenedNode.isLeaf) {
-        if (this.checkStrictly) {
-          this.traverseChildren(flattenedNode, childNode => {
-            if (childNode.checked) {
-              hasChildrenChecked = true;
-              return true;
-            }
-          });
-        } else {
-          // 如果父子节点勾选关联，则有无子节点选中的状态就是当前节点的选中状态
-          hasChildrenChecked = checked;
+      // 会导致渲染变慢，下一个 tick 执行，优先渲染
+      this.$nextTick(() => {
+        this.$emit('check', flattenedNode.originNode, {
+          checkedNodes: this.getCheckedNodes(),
+          checkedKeys: this.getCheckedKeys(),
+          halfCheckedNodes: this.getHalfCheckedNodes(),
+          halfCheckedKeys: this.getHalfCheckedKeys()
+        });
+  
+        let hasChildrenChecked = false;
+  
+        if (!flattenedNode.isLeaf) {
+          if (this.checkStrictly) {
+            this.traverseChildren(flattenedNode, childNode => {
+              if (childNode.checked) {
+                hasChildrenChecked = true;
+                return true;
+              }
+            });
+          } else {
+            // 如果父子节点勾选关联，则有无子节点选中的状态就是当前节点的选中状态
+            hasChildrenChecked = checked;
+          }
         }
-      }
-
-      this.$emit('check-change', flattenedNode.originNode, checked, hasChildrenChecked)
+  
+        this.$emit('check-change', flattenedNode.originNode, checked, hasChildrenChecked)
+      });
     },
 
     traverseChildren(flattenedNode, fn) {
@@ -532,7 +503,7 @@ export default {
       const {
         defaultExpandAll,
         nodeKey,
-        defaultCheckedKeys,
+        // defaultCheckedKeys,
         defaultExpandedKeys,
         props: {
           label,
@@ -546,7 +517,7 @@ export default {
 
       const expanded = defaultExpandAll ? true : (nodeKey && defaultExpandedKeys ? defaultExpandedKeys.includes(originNode[nodeKey]) : false);
       const visible = level === 0 ? true : parent.expanded;
-      const checked = nodeKey ? (defaultCheckedKeys ? defaultCheckedKeys.includes(originNode[nodeKey]) : false) : false;
+      // const checked = nodeKey ? (defaultCheckedKeys ? defaultCheckedKeys.includes(originNode[nodeKey]) : false) : false;
       const key = nodeKey ? originNode[nodeKey] : null;
 
       const flattenedNode = {
@@ -556,7 +527,7 @@ export default {
         level,
         expanded,
         visible,
-        checked,
+        checked: false,
         indeterminate: false,
         filtered: false,
         hasFilteredChildren: false,
