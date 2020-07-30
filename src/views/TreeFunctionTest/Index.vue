@@ -4,7 +4,7 @@
     <el-tree
       ref="tree"
       style="width: 200px;"
-      :data="bigData"
+      :data="treeData"
       :props="treeProps"
       node-key="id"
       :filter-node-method="filterNode"
@@ -19,22 +19,23 @@ const treeData = [
     id: 1,
     name: '0-1',
     children: [
-      { id: 2, name: '0-1-1' },
+      { id: 2, name: '0-1-1', disabled: true },
       { 
-        id: 2, 
+        id: 9, 
         name: '0-1-2', 
+        disabled: true,
         children: [{ id: 3, name: '1-2-1' }]
       },
-      { id: 4, name: '0-1-3' },
+      { id: 4, name: '0-1-3', disabled: true },
     ]
   },
   {
     id: 5,
     name: '0-2',
     children: [
-      { id: 6, name: '0-2-1' },
-      { id: 7, name: '0-2-2' },
-      { id: 8, name: '0-2-3' }
+      { id: 6, name: '0-2-1', disabled: true },
+      { id: 7, name: '0-2-2', disabled: true },
+      { id: 8, name: '0-2-3', disabled: true }
     ]
   }
 ];

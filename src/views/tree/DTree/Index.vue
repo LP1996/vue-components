@@ -13,9 +13,20 @@
       node-key="id"
       show-checkbox
       empty-text="就没数据了~"
+      @check="handleCheckNode"
+      @check-change="handleCheckChange"
     >
       <template v-slot:empty>
         <span>没有数据，难受</span>
+      </template>
+
+      <template v-slot:content="{ node, data }">
+        <div>
+          <img class="label-icon" src="~@/assets/logo.png">
+          <span>{{ data.name }}</span>
+          <el-button type="text">添加</el-button>
+          <el-button type="text">修改</el-button>
+        </div>
       </template>
     </d-tree>
   </section>
@@ -34,7 +45,10 @@ export default {
       filterText: '',
       props: {
         label: 'name',
-        children: 'children'
+        children: 'children',
+        disabled(data) {
+          return data.id > 100;
+        }
       }
     }
   },
@@ -51,12 +65,23 @@ export default {
     },
     filterMethod(val, data) {
       return data.name.includes(val);
+    },
+    handleCheckNode(data, checkedData) {
+      console.log(data, checkedData);
+    },
+    handleCheckChange(data, chcked, hasChildrenChecked) {
+      console.log(data, chcked, hasChildrenChecked);
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-
+.label-icon {
+  width: 15px;
+  height: 15px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
 </style>
 

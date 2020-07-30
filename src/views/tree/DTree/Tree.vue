@@ -1,11 +1,14 @@
 <template>
   <div ref="wrapper" class="d-tree" :style="treeWrapperStyle" @scroll="onScroll">
     <div ref="phantom" class="d-tree-phantom"></div>
+
     <template v-if="!filteredNodes.length">
       <slot name="empty">
         <div class="d-tree-empty" :style="{ lineHeight: `${treeWrapperHeight}px` }">{{ emptyText || '暂无数据' }}</div>
       </slot>
     </template>
+
+    <!-- 没有节点时高度为0，所以不需要 v-else -->
     <div ref="nodesWrapper" class="d-tree-nodes">
       <div
         v-for="node in showData"
@@ -16,7 +19,8 @@
         @click="handleNodeClick(node)"
       >
         <!-- indent -->
-        <span class="d-tree-node__indent" :style="{ width: `${node.level * indent}px` }"></span>
+        <!-- 不使用 width 是因为 white-space: nowrap 会将该元素宽度忽略 -->
+        <span class="d-tree-node__indent" :style="{ paddingLeft: `${node.level * indent}px` }"></span>
 
         <!-- expand-icon -->
         <span
@@ -24,8 +28,17 @@
           :class="{ 'is-leaf': node.isLeaf }"
           @click.stop="handleProcessNodeExpandOrCollapse(node)"
         >
-          <i v-if="node.expanded" class="el-icon-caret-bottom"></i>
-          <i v-else class="el-icon-caret-right"></i>
+          <template v-if="node.expanded">
+            <slot name="expanded-icon">
+              <i :class="expandedIcon"></i>
+            </slot>
+          </template>
+
+          <template v-else>
+            <slot name="collapsed-icon">
+              <i :class="collapsedIcon"></i>
+            </slot>
+          </template>
         </span>
 
         <el-checkbox
@@ -33,6 +46,7 @@
           v-model="node.checked"
           :indeterminate="node.indeterminate"
           class="mr10"
+          :disabled="node.disabled"
           @change="handleNodeCheckChange(node, $event)"
         />
 
@@ -40,9 +54,11 @@
         <span v-if="node.loading" class="d-tree-node__loading-icon el-icon-loading"></span>
 
         <!-- content -->
-        <span class="d-tree-node__content">
-          {{ node.label }}
-        </span>
+        <slot name="content" v-bind="{ node, data: node.originNode }">
+          <span class="d-tree-node__content">
+            {{ node.label }}
+          </span>
+        </slot>
       </div>
     </div>
   </div>
@@ -149,6 +165,14 @@ export default {
     },
     emptyText: {
       type: String
+    },
+    expandedIcon: {
+      type: String,
+      default: 'el-icon-caret-bottom'
+    },
+    collapsedIcon: {
+      type: String,
+      default: 'el-icon-caret-right'
     }
   },
   data() {
@@ -215,11 +239,7 @@ export default {
     }),
 
     changeIndex() {
-      // const { $refs: { wrapper: { scrollTop: originScrollTop, scrollHeight } }, flattenedNodes: { length }, visibleCount, treeWrapperHeight } = this;
       const { $refs: { wrapper: { scrollTop: originScrollTop } }, visibleCount } = this;
-
-      // const scrollPtg = getScrollPercentage(originScrollTop, treeWrapperHeight, scrollHeight);
-      // const { startIndex, endIndex } = getRangeIndex(scrollPtg, length, visibleCount);
       const startIndex = Math.floor(originScrollTop / this.nodeHeight);
       const endIndex = startIndex + visibleCount;
       this.startIndex = startIndex;
@@ -228,7 +248,6 @@ export default {
 
     setDOMRelated() {
       const { nodeHeight, filteredNodes } = this;
-      console.log(filteredNodes.length);
       const scrollHeight = nodeHeight * filteredNodes.length;
       this.$refs.phantom.style.height = `${scrollHeight}px`;
     },
@@ -244,8 +263,7 @@ export default {
       }
 
       this.selectedNode = flattenedNode;
-
-      this.$emit('node-click', originNode, flattenedNode);
+      this.$emit('current-change', flattenedNode.data, flattenedNode);
 
       if (isLeaf || !this.expandOnClickNode || (this.isFiltering && !hasFilteredChildren)) {
         return;
@@ -258,6 +276,8 @@ export default {
       }
 
       this.handleProcessNodeExpandOrCollapse(flattenedNode);
+
+      this.$emit('node-click', originNode, flattenedNode);
     },
 
     handleLazyLoad(flattenedNode) {
@@ -327,25 +347,95 @@ export default {
     },
 
     handleNodeCheckChange(flattenedNode, checked) {
+      if (!this.checkStrictly) {
+        flattenedNode.indeterminate = false;
+        // 如果所有子节点都是 disabled 状态，则该节点不允许选中
+        // 如果孙子节点有不是 disabled 状态的，但是子节点全是 disabled 状态的，该节点也不允许选中
+        this.traverseChildren(
+          flattenedNode,
+          childNode => {
+            if (childNode.isLeaf || !childNode.children.length) {
+              childNode.checked = checked;
+              childNode.indeterminate = false;
+              return;
+            }
 
-      this.traverseChildren(
-        flattenedNode,
-        childNode => {
-          childNode.checked = checked;
-          childNode.indeterminate = false;
+            const [disabledCount, disabledChecked] = childNode.children.reduce((count, subChildNode) => {
+              subChildNode.disabled && count[0]++;
+              subChildNode.disabled && subChildNode.checked && count[1]++;
+              return count;
+            }, [0, 0]);
+
+            const allDisabled = disabledCount === childNode.children.length;
+            const hasDisabled = disabledCount > 0 && disabledCount < childNode.children.length;
+            const noDisabled = disabledCount === 0;
+
+            // 所有子节点都是 disabled 状态则直接返回，不需要再处理孙子节点
+            if (allDisabled) {
+              childNode.checked = false;
+              childNode.indeterminate = false;
+              return true;
+            }
+
+            if (hasDisabled) {
+              childNode.checked = false;
+              childNode.indeterminate = disabledChecked !== 0;
+              return;
+            }
+
+            // TODO: 处理子节点的回溯，子节点有 indeterminate，需要回溯到这里改变父节点的状态
+            childNode.checked = true;
+            childNode.indeterminate = false;
+            // if (!childNode.disabled) {
+            //   childNode.checked = checked;
+            //   childNode.indeterminate = false;
+            // } else {
+            //   childNode.disabled && !childNode.checked && this.traverseParent(childNode, parentNode => {
+            //     parentNode.checked = false;
+            //     parentNode.indeterminate = true;
+            //   });
+            // }
+          }
+        );
+
+        this.traverseParent(
+          flattenedNode,
+          parentNode => {
+            const isAllChecked = parentNode.children.every(({ checked }) => checked);
+            const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
+  
+            parentNode.checked = isAllChecked;
+            parentNode.indeterminate = hasChecked && !isAllChecked;
+          }
+        );
+      } else {
+        flattenedNode.indeterminate = false;
+      }
+
+      this.$emit('check', flattenedNode.originNode, {
+        checkedNodes: this.getCheckedNodes(),
+        checkedKeys: this.getCheckedKeys(),
+        halfCheckedNodes: this.getHalfCheckedNodes(),
+        halfCheckedKeys: this.getHalfCheckedKeys()
+      });
+
+      let hasChildrenChecked = false;
+
+      if (!flattenedNode.isLeaf) {
+        if (this.checkStrictly) {
+          this.traverseChildren(flattenedNode, childNode => {
+            if (childNode.checked) {
+              hasChildrenChecked = true;
+              return true;
+            }
+          });
+        } else {
+          // 如果父子节点勾选关联，则有无子节点选中的状态就是当前节点的选中状态
+          hasChildrenChecked = checked;
         }
-      );
+      }
 
-      this.traverseParent(
-        flattenedNode,
-        parentNode => {
-          const isAllChecked = parentNode.children.every(({ checked }) => checked);
-          const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
-
-          parentNode.checked = isAllChecked;
-          parentNode.indeterminate = hasChecked && !isAllChecked;
-        }
-      );
+      this.$emit('check-change', flattenedNode.originNode, checked, hasChildrenChecked)
     },
 
     traverseChildren(flattenedNode, fn) {
@@ -479,11 +569,15 @@ export default {
       const computedChildren =  typeof children === 'function' ? children(originNode, flattenedNode) : originNode[children];
 
       let isDisabled = false;
-      if (disabled !== undefined) {
-        if (typeof disabled === 'boolean') {
-          isDisabled = disabled;
-        } else if (typeof disabled === 'function') {
-          isDisabled = disabled(originNode, flattenedNode);
+      if (originNode.disabled) {
+        isDisabled = true;
+      } else {
+        if (disabled !== undefined) {
+          if (typeof disabled === 'boolean') {
+            isDisabled = disabled;
+          } else if (typeof disabled === 'function') {
+            isDisabled = disabled(originNode, flattenedNode);
+          }
         }
       }
 
@@ -516,11 +610,8 @@ export default {
         map[key] = 1;
         return map;
       }, {});
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
 
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
+      this.traverseFlattenedNodes(flattenedNode => {
         const canSet = leafonly ? flattenedNode.isLeaf : true;
 
         if (canSet && keyMap[flattenedNode.key]) {
@@ -528,7 +619,7 @@ export default {
           flattenedNode.indeterminate = false;
           this.handleNodeCheckChange(flattenedNode, true);
         }
-      }
+      });
     },
 
     setCheckedNodes(nodes) {
@@ -545,17 +636,14 @@ export default {
       if (!this.nodeKey) {
         return [];
       }
-
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
       const checkedKeys = [];
 
-      for (let i = 0; i < len; i++) {
-        const { key, checked, isLeaf } = flattenedNodes[i];
+      this.traverseFlattenedNodes(flattenedNode => {
+        const { key, checked, isLeaf } = flattenedNode;
         const canGet = leafonly ? isLeaf : true;
 
         canGet && checked && checkedKeys.push(key);
-      }
+      });
 
       return checkedKeys;
     },
@@ -565,16 +653,14 @@ export default {
         return [];
       }
 
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
       const checkedNodes = [];
 
-      for (let i = 0; i < len; i++) {
-        const { originNode, checked, isLeaf } = flattenedNodes[i];
+      this.traverseFlattenedNodes(flattenedNode => {
+        const { originNode, checked, isLeaf } = flattenedNode;
         const canGet = leafonly ? isLeaf : true;
 
         canGet && checked && checkedNodes.push(originNode);
-      }
+      });
 
       return checkedNodes;
     },
@@ -586,20 +672,16 @@ export default {
 
       const isData = typeof keyOrData === 'object';
       const key = isData ? keyOrData[this.nodeKey] : keyOrData;
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
 
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      this.traverseFlattenedNodes(flattenedNode => {
         if (flattenedNode.key === key) {
           flattenedNode.checked = checked;
           flattenedNode.indeterminate = false;
-  
+
           deep && this.handleNodeCheckChange(flattenedNode, checked);
-          break;
+          return true;
         }
-      }
+      });
     },
 
     getHalfCheckedNodes() {
@@ -607,17 +689,13 @@ export default {
         return [];
       }
 
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
       const results = [];
 
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      this.traverseFlattenedNodes(flattenedNode => {
         if (flattenedNode.indeterminate) {
           results.push(flattenedNode);
         }
-      }
+      });
 
       return results;
     },
@@ -627,17 +705,13 @@ export default {
         return [];
       }
 
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
       const results = [];
 
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      this.traverseFlattenedNodes(flattenedNode => {
         if (flattenedNode.indeterminate) {
           results.push(flattenedNode.key);
         }
-      }
+      });
 
       return results;
     },
@@ -647,18 +721,16 @@ export default {
         return null;
       }
 
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
+      let key = null;
 
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      this.traverseFlattenedNodes(flattenedNode => {
         if (flattenedNode.selected) {
-          return flattenedNode.key;
+          key = flattenedNode.key;
+          return true;
         }
-      }
+      });
 
-      return null;
+      return key;
     },
 
     getCurrentNode() {
@@ -666,18 +738,14 @@ export default {
         return null;
       }
 
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
-
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      let currentNodeData = null;
+      this.traverseFlattenedNodes(flattenedNode => {
         if (flattenedNode.selected) {
-          return flattenedNode.originNode;
+          currentNodeData = flattenedNode.originNode;
         }
-      }
+      });
 
-      return null;
+      return currentNodeData;
     },
 
     setCurrentKey(key) {
@@ -690,18 +758,13 @@ export default {
         return;
       }
 
-      const { flattenedNodes } = this;
-      const len = flattenedNodes.length;
-
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      this.traverseFlattenedNodes(flattenedNode => {
         flattenedNode.selected = false;
 
         if (key === flattenedNode.key) {
           flattenedNode.selected = true;
         }
-      }
+      });
     },
 
     setCurrentNode(node) {
@@ -730,12 +793,9 @@ export default {
       }
 
       this.isFiltering = true;
-      const { flattenedNodes, filterNodeMethod } = this;
-      const len = flattenedNodes.length;
+      const { filterNodeMethod } = this;
 
-      for (let i = 0; i < len; i++) {
-        const flattenedNode = flattenedNodes[i];
-
+      this.traverseFlattenedNodes(flattenedNode => {
         // true 表示该节点可以显示
         const canShow = filterNodeMethod(val, flattenedNode.originNode, flattenedNode);
         flattenedNode.visible = canShow;
@@ -749,7 +809,7 @@ export default {
             parentNode.hasFilteredChildren = true;
           });
         }
-      }
+      });
 
       this.filterFlattenedNodes();
       this.setDOMRelated();
@@ -792,6 +852,8 @@ export default {
   justify-content: flex-start;
   align-items: center;
   height: 26px;
+  white-space: nowrap;
+  cursor: pointer;
 
   &:hover, &.selected {
     background-color: #f5f7fa;
