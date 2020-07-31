@@ -174,6 +174,10 @@ export default {
     collapsedIcon: {
       type: String,
       default: 'el-icon-caret-right'
+    },
+    filterCheckStrictly: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -358,25 +362,50 @@ export default {
 
     handleNodeCheckChange(flattenedNode, checked) {
       flattenedNode.indeterminate = false;
-      if (!this.checkStrictly) {
-        this.traverseChildren(
-          flattenedNode,
-          childNode => {
-            childNode.checked = checked;
-            childNode.indeterminate = false;
-          }
-        );
 
-        this.traverseParent(
-          flattenedNode,
-          parentNode => {
-            const isAllChecked = parentNode.children.every(({ checked }) => checked);
-            const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
+      if (!this.checkStrictly) {
+        // 只有在筛选的时候，并且是选中该节点，并且当前节点不是叶子节点的时候才走当前分支
+        // 1. 如果是不选中该节点，则不用更具筛选判断父元素或者子元素状态，全部设置为 ckecked=false 即可
+        // 2. 如果当前节点是叶子节点，则不用遍历子元素，更新祖先节点即可，所以走 else 分支
+        if (this.isFiltering && this.filterCheckStrictly && checked && !flattenedNode.isLeaf) {
+          this.traverseChildren(flattenedNode, chilNode => {
+            // 如果节点是被筛选出来的
+            if (chilNode.filtered) {
+              chilNode.checked = checked;
+              chilNode.indeterminate = false;
+              return;
+            }
+
+            // 筛选之前就选中的，并且被筛选出去的节点，不做处理
+            if (chilNode.checked) {
+              return;
+            }
+
+            this.traverseParent(chilNode, parentNode => {
+              parentNode.checked = false;
+              parentNode.indeterminate = true;
+            });
+          });
+        } else {
+          this.traverseChildren(
+            flattenedNode,
+            childNode => {
+              childNode.checked = checked;
+              childNode.indeterminate = false;
+            }
+          );
   
-            parentNode.checked = isAllChecked;
-            parentNode.indeterminate = hasChecked && !isAllChecked;
-          }
-        );
+          this.traverseParent(
+            flattenedNode,
+            parentNode => {
+              const isAllChecked = parentNode.children.every(({ checked }) => checked);
+              const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
+    
+              parentNode.checked = isAllChecked;
+              parentNode.indeterminate = hasChecked && !isAllChecked;
+            }
+          );
+        }
       }
 
       // 会导致渲染变慢，下一个 tick 执行，优先渲染
@@ -759,6 +788,9 @@ export default {
           flattenedNode.filtered = false;
           flattenedNode.hasFilteredChildren = false;
         });
+
+        this.filterFlattenedNodes();
+        this.setDOMRelated();
         return;
       }
 

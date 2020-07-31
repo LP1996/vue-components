@@ -13,6 +13,7 @@
       node-key="id"
       show-checkbox
       defaultExpandAll
+      filterCheckStrictly
       empty-text="就没数据了~"
       :defaultCheckedKeys="[285]"
       @check="handleCheckNode"
