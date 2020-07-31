@@ -12,8 +12,8 @@
       :filter-node-method="filterMethod"
       node-key="id"
       show-checkbox
-      empty-text="就没数据了~"
       defaultExpandAll
+      empty-text="就没数据了~"
       :defaultCheckedKeys="[285]"
       @check="handleCheckNode"
       @check-change="handleCheckChange"

@@ -249,7 +249,7 @@ export default {
 
       // TODO: 虚拟滚动重写
       // 防止最后一个元素不停滚动问题
-      const isOverflow = scrollTop > (scrollHeight - treeWrapperHeight);
+      const isOverflow = scrollHeight > treeWrapperHeight && scrollTop >= (scrollHeight - treeWrapperHeight);
       const startIndex = Math.floor(scrollTop / this.nodeHeight) + (isOverflow ? 1 : 0);
       const endIndex = startIndex + visibleCount;
       this.startIndex = startIndex;
@@ -357,6 +357,7 @@ export default {
     },
 
     handleNodeCheckChange(flattenedNode, checked) {
+      flattenedNode.indeterminate = false;
       if (!this.checkStrictly) {
         this.traverseChildren(
           flattenedNode,
@@ -376,8 +377,6 @@ export default {
             parentNode.indeterminate = hasChecked && !isAllChecked;
           }
         );
-      } else {
-        flattenedNode.indeterminate = false;
       }
 
       // 会导致渲染变慢，下一个 tick 执行，优先渲染
