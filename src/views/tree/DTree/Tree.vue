@@ -245,7 +245,7 @@ export default {
       const shouldStartIndex = Math.floor(scrollTop / this.nodeHeight);
       const realStartIndex = Math.max(0, shouldStartIndex - paddingNumber);
       const shouldEndIndex = Math.ceil((scrollTop + treeWrapperHeight) / nodeHeight);
-      const realEndIndex = Math.min(length - 1, shouldEndIndex + 2 * paddingNumber);
+      const realEndIndex = Math.min(length - 1, shouldEndIndex + paddingNumber);
 
       this.startIndex =  realStartIndex;
       this.endIndex = realEndIndex;
