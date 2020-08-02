@@ -36,7 +36,7 @@ while (stack.length) {
 
   const children = [];
 
-  for (let i = 0; i < 3000; i++) {
+  for (let i = 0; i < 300; i++) {
     children.push({ id: startId++, name: `${node.name}-${i}` });
   }
 

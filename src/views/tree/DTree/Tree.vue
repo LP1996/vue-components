@@ -1,71 +1,72 @@
 <template>
   <div ref="wrapper" class="d-tree" :style="treeWrapperStyle" @scroll="onScroll">
-    <div ref="phantom" class="d-tree-phantom"></div>
+    <div ref="phantom" class="d-tree-phantom">
+      <!-- 没有节点时高度为0，所以不需要 v-else -->
+      <div ref="nodesWrapper" class="d-tree-nodes">
+        <div
+          v-for="node in showData"
+          :key="node.key || node.label"
+          class="d-tree-node"
+          :class="{ selected: node.selected }"
+          :style="treeNodeStyle"
+          @click="handleNodeClick(node)"
+        >
+          <!-- indent -->
+          <!-- 不使用 width 是因为 white-space: nowrap 会将该元素宽度忽略 -->
+          <span class="d-tree-node__indent" :style="{ paddingLeft: `${node.level * indent}px` }"></span>
+
+          <!-- expand-icon -->
+          <span
+            class="d-tree-node__expand-icon"
+            :class="{ 'is-leaf': node.isLeaf }"
+            @click.stop="handleProcessNodeExpandOrCollapse(node)"
+          >
+            <template v-if="node.expanded">
+              <slot name="expanded-icon">
+                <i :class="expandedIcon"></i>
+              </slot>
+            </template>
+
+            <template v-else>
+              <slot name="collapsed-icon">
+                <i :class="collapsedIcon"></i>
+              </slot>
+            </template>
+          </span>
+
+          <el-checkbox
+            v-if="showCheckbox"
+            v-model="node.checked"
+            :indeterminate="node.indeterminate"
+            class="mr10"
+            @click.stop
+            @change="handleNodeCheckChange(node, $event)"
+          />
+
+          <!-- lazy loading -->
+          <span v-if="node.loading" class="d-tree-node__loading-icon el-icon-loading"></span>
+
+          <!-- content -->
+          <slot name="content" v-bind="{ node, data: node.originNode }">
+            <span class="d-tree-node__content">
+              {{ node.label }}
+            </span>
+          </slot>
+        </div>
+      </div>
+    </div>
 
     <template v-if="!filteredNodes.length">
       <slot name="empty">
         <div class="d-tree-empty" :style="{ lineHeight: `${treeWrapperHeight}px` }">{{ emptyText || '暂无数据' }}</div>
       </slot>
     </template>
-
-    <!-- 没有节点时高度为0，所以不需要 v-else -->
-    <div ref="nodesWrapper" class="d-tree-nodes">
-      <div
-        v-for="node in showData"
-        :key="node.key || node.label"
-        class="d-tree-node"
-        :class="{ selected: node.selected }"
-        :style="treeNodeStyle"
-        @click="handleNodeClick(node)"
-      >
-        <!-- indent -->
-        <!-- 不使用 width 是因为 white-space: nowrap 会将该元素宽度忽略 -->
-        <span class="d-tree-node__indent" :style="{ paddingLeft: `${node.level * indent}px` }"></span>
-
-        <!-- expand-icon -->
-        <span
-          class="d-tree-node__expand-icon"
-          :class="{ 'is-leaf': node.isLeaf }"
-          @click.stop="handleProcessNodeExpandOrCollapse(node)"
-        >
-          <template v-if="node.expanded">
-            <slot name="expanded-icon">
-              <i :class="expandedIcon"></i>
-            </slot>
-          </template>
-
-          <template v-else>
-            <slot name="collapsed-icon">
-              <i :class="collapsedIcon"></i>
-            </slot>
-          </template>
-        </span>
-
-        <el-checkbox
-          v-if="showCheckbox"
-          v-model="node.checked"
-          :indeterminate="node.indeterminate"
-          class="mr10"
-          @click.stop
-          @change="handleNodeCheckChange(node, $event)"
-        />
-
-        <!-- lazy loading -->
-        <span v-if="node.loading" class="d-tree-node__loading-icon el-icon-loading"></span>
-
-        <!-- content -->
-        <slot name="content" v-bind="{ node, data: node.originNode }">
-          <span class="d-tree-node__content">
-            {{ node.label }}
-          </span>
-        </slot>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-function throttle(fn, interval = 30, context) {
+// eslint-disable-next-line
+function throttle(fn, interval = 16, context) {
   let timer = null;
   let lastTime = 0;
   return function(...args) {
@@ -188,9 +189,9 @@ export default {
       treeWrapperHeight: 0,
       startIndex: 0,
       endIndex: 0,
-      visibleCount: 0,
       selectedNode: null,
-      isFiltering: false
+      isFiltering: false,
+      paddingNumber: 1
     }
   },
   computed: {
@@ -230,8 +231,6 @@ export default {
     this.filterFlattenedNodes();
 
     this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
-    this.scrollTop = this.$refs.wrapper.scrollTop;
-    this.visibleCount = Math.ceil(this.treeWrapperHeight / this.nodeHeight);
     this.setDOMRelated();
     this.onScroll();
 
@@ -241,24 +240,18 @@ export default {
   },
   methods: {
     onScroll: throttle(function onScroll() {
-      const { $refs: { wrapper: { scrollTop: originScrollTop, scrollHeight } }, treeWrapperHeight } = this;
-      const scrollTop = alignScrollTop(originScrollTop, scrollHeight - treeWrapperHeight);
-      this.scrollTop = scrollTop;
-      this.$refs.nodesWrapper.style.transform = `translateY(${scrollTop}px)`;
-      this.changeIndex();
+      const { $refs: { wrapper: { scrollTop } }, filteredNodes: { length }, nodeHeight, treeWrapperHeight, paddingNumber } = this;
+
+      const shouldStartIndex = Math.floor(scrollTop / this.nodeHeight);
+      const realStartIndex = Math.max(0, shouldStartIndex - paddingNumber);
+      const shouldEndIndex = Math.ceil((scrollTop + treeWrapperHeight) / nodeHeight);
+      const realEndIndex = Math.min(length - 1, shouldEndIndex + 2 * paddingNumber);
+
+      this.startIndex =  realStartIndex;
+      this.endIndex = realEndIndex;
+
+      this.$refs.nodesWrapper.style.transform = `translateY(${realStartIndex * nodeHeight}px)`;
     }),
-
-    changeIndex() {
-      const { $refs: { wrapper: { scrollTop, scrollHeight } }, visibleCount, treeWrapperHeight } = this;
-
-      // TODO: 虚拟滚动重写
-      // 防止最后一个元素不停滚动问题
-      const isOverflow = scrollHeight > treeWrapperHeight && scrollTop >= (scrollHeight - treeWrapperHeight);
-      const startIndex = Math.floor(scrollTop / this.nodeHeight) + (isOverflow ? 1 : 0);
-      const endIndex = startIndex + visibleCount;
-      this.startIndex = startIndex;
-      this.endIndex = endIndex;
-    },
 
     setDOMRelated() {
       const { nodeHeight, filteredNodes } = this;

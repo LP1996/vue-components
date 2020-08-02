@@ -6,7 +6,6 @@
       ref="tree"
       :data="treeData"
       :height="600"
-      :node-height="20"
       :props="props"
       :load="handleLazyLoad"
       :filter-node-method="filterMethod"
