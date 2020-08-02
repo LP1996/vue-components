@@ -3,7 +3,8 @@
     <div id="nav">
       <router-link to="/">Home</router-link> |
       <router-link to="/el-tree">el-tree-test</router-link> |
-      <router-link to="/d-tree">d-tree</router-link>
+      <router-link to="/d-tree">d-tree</router-link> | 
+      <router-link to="/d-scroll">virtual-scroll</router-link> | 
     </div>
     <router-view />
   </div>

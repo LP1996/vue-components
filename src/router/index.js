@@ -28,6 +28,11 @@ const routes = [
     path: '/d-tree',
     name: 'd-tree',
     component: () => import('../views/tree/Index.vue')
+  },
+  {
+    path: '/d-scroll',
+    name: 'virtual-scroll',
+    component: () => import('../views/VirtualScroll/Index.vue')
   }
 ];
 
