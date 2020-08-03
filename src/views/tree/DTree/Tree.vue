@@ -224,28 +224,44 @@ export default {
       return this.filteredNodes.slice(this.startIndex, this.endIndex);
     }
   },
-  mounted() {
-    const data = this.flatten(this.data);
-    console.log(data.length);
-    this.flattenedNodes = data;
-    this.filterFlattenedNodes();
-
-    this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
-    this.setDOMRelated();
-    this.onScroll();
-
-    if (this.defaultCheckedKeys && this.defaultCheckedKeys.length) {
-      this.setCheckedKeys(this.defaultCheckedKeys);
+  watch: {
+    data() {
+      this.init();
     }
   },
+  mounted() {
+    this.init();
+  },
   methods: {
+    init() {
+      // 如果还没有数据，则不执行
+      if (!this.data || !this.data.length) {
+        return;
+      }
+
+      const data = this.flatten(this.data);
+      console.log(data.length);
+      this.flattenedNodes = data;
+      this.filterFlattenedNodes();
+
+      this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
+      this.setDOMRelated();
+      this.onScroll();
+
+      if (this.defaultCheckedKeys && this.defaultCheckedKeys.length) {
+        this.setCheckedKeys(this.defaultCheckedKeys);
+      }
+    },
+
     onScroll: throttle(function onScroll() {
       const { $refs: { wrapper: { scrollTop } }, filteredNodes: { length }, nodeHeight, treeWrapperHeight, paddingNumber } = this;
 
       const shouldStartIndex = Math.floor(scrollTop / this.nodeHeight);
       const realStartIndex = Math.max(0, shouldStartIndex - paddingNumber);
       const shouldEndIndex = Math.ceil((scrollTop + treeWrapperHeight) / nodeHeight);
-      const realEndIndex = Math.min(length - 1, shouldEndIndex + paddingNumber);
+
+      // 因为 slice 方法不会截取 end 的元素，所以这里 length 不需要 -1
+      const realEndIndex = Math.min(length, shouldEndIndex + paddingNumber);
 
       this.startIndex =  realStartIndex;
       this.endIndex = realEndIndex;
@@ -332,6 +348,9 @@ export default {
 
       this.filterFlattenedNodes();
       this.setDOMRelated();
+
+      // 更新 index
+      this.onScroll();
     },
 
     handleNodeExpand(flattenedNode) {
