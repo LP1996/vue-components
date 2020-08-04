@@ -241,10 +241,10 @@ export default {
     this.init();
 
     // 当百分比高度 resize 时，需要重新计算 index
-    window.addEventListener('resize', this.onScroll, false);
+    window.addEventListener('resize', this.onResize, false);
   },
   beforeDestroy() {
-    window.removeEventListener('resize', this.onScroll);
+    window.removeEventListener('resize', this.onResize);
   },
   methods: {
     init() {
@@ -254,7 +254,7 @@ export default {
       }
 
       const data = this.flatten(this.data);
-      console.log(data.length);
+
       this.flattenedNodes = data;
       this.filterFlattenedNodes();
 
@@ -282,6 +282,11 @@ export default {
 
       this.$refs.nodesWrapper.style.transform = `translateY(${realStartIndex * nodeHeight}px)`;
     }),
+
+    onResize() {
+      this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
+      this.onScroll();
+    },
 
     setDOMRelated() {
       const { nodeHeight, filteredNodes } = this;
