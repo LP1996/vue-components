@@ -1,11 +1,11 @@
 <template>
-  <section>
+  <section style="height: 100%;">
     <el-input v-model="filterText" />
 
     <d-tree
       ref="tree"
       :data="treeData"
-      :height="600"
+      height="90%"
       :props="props"
       :load="handleLazyLoad"
       :filter-node-method="filterMethod"

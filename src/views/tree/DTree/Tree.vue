@@ -239,6 +239,12 @@ export default {
   },
   mounted() {
     this.init();
+
+    // 当百分比高度 resize 时，需要重新计算 index
+    window.addEventListener('resize', this.onScroll, false);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.onScroll);
   },
   methods: {
     init() {

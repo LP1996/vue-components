@@ -25,5 +25,6 @@ export default {
 .tree-index {
   display: flex;
   justify-content: center;
+  height: 100%;
 }
 </style>
