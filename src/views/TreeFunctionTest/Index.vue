@@ -74,8 +74,8 @@ export default {
     handleCheck() {
       console.log('check event--------');
     },
-    handleCheckChange() {
-      console.log('check change event-----------');
+    handleCheckChange(data, chcked) {
+      console.log('check change event-----------', data, chcked);
     }
   }
 }

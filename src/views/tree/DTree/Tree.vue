@@ -395,7 +395,7 @@ export default {
       this.traverseChildren(flattenedNode, childNode => childNode.visible = false);
     },
 
-    handleNodeCheckChange(flattenedNode, checked) {
+    handleNodeCheckChange(flattenedNode, checked, notTriggerCheckEvent) {
       flattenedNode.indeterminate = false;
 
       if (!this.checkStrictly) {
@@ -435,7 +435,7 @@ export default {
             parentNode => {
               const isAllChecked = parentNode.children.every(({ checked }) => checked);
               const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
-    
+
               parentNode.checked = isAllChecked;
               parentNode.indeterminate = hasChecked && !isAllChecked;
             }
@@ -443,17 +443,24 @@ export default {
         }
       }
 
+      this.triggerCheckRelateEvent(flattenedNode, checked, notTriggerCheckEvent);
+    },
+
+    triggerCheckRelateEvent(flattenedNode, checked, notTriggerCheckEvent) {
       // 会导致渲染变慢，下一个 tick 执行，优先渲染
       this.$nextTick(() => {
-        this.$emit('check', flattenedNode.originNode, {
-          checkedNodes: this.getCheckedNodes(),
-          checkedKeys: this.getCheckedKeys(),
-          halfCheckedNodes: this.getHalfCheckedNodes(),
-          halfCheckedKeys: this.getHalfCheckedKeys()
-        });
-  
+        // 设置 setCheckedKeys 的时候不需要触发 check 事件
+        if (!notTriggerCheckEvent) {
+          this.$emit('check', flattenedNode.originNode, {
+            checkedNodes: this.getCheckedNodes(),
+            checkedKeys: this.getCheckedKeys(),
+            halfCheckedNodes: this.getHalfCheckedNodes(),
+            halfCheckedKeys: this.getHalfCheckedKeys()
+          });
+        }
+
         let hasChildrenChecked = false;
-  
+
         if (!flattenedNode.isLeaf) {
           if (this.checkStrictly) {
             this.traverseChildren(flattenedNode, childNode => {
@@ -467,8 +474,8 @@ export default {
             hasChildrenChecked = checked;
           }
         }
-  
-        this.$emit('check-change', flattenedNode.originNode, checked, hasChildrenChecked)
+
+        this.$emit('check-change', flattenedNode.originNode, checked, hasChildrenChecked);
       });
     },
 
@@ -651,7 +658,7 @@ export default {
         if (canSet && keyMap[flattenedNode.key]) {
           flattenedNode.checked = true;
           flattenedNode.indeterminate = false;
-          this.handleNodeCheckChange(flattenedNode, true);
+          this.handleNodeCheckChange(flattenedNode, true, true);
         }
       });
     },
@@ -712,7 +719,7 @@ export default {
           flattenedNode.checked = checked;
           flattenedNode.indeterminate = false;
 
-          deep && this.handleNodeCheckChange(flattenedNode, checked);
+          deep && this.handleNodeCheckChange(flattenedNode, checked, true);
           return true;
         }
       });

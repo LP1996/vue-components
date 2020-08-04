@@ -132,11 +132,13 @@ export default {
     filterMethod(val, data) {
       return data.name.includes(val);
     },
-    handleCheckNode(data, checkedData) {
-      console.log(data, checkedData);
+    handleCheckNode() {
+      console.log('check event---------');
+      // console.log(data, checkedData);
     },
-    handleCheckChange(data, chcked, hasChildrenChecked) {
-      console.log(data, chcked, hasChildrenChecked);
+    handleCheckChange(data, checked) {
+      console.log('check change event---------------', data, checked);
+      // console.log(data, chcked, hasChildrenChecked);
     }
   }
 }
