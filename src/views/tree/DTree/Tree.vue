@@ -253,18 +253,21 @@ export default {
         return;
       }
 
-      const data = this.flatten(this.data);
+      this.$nextTick(() => {
+        // 等待 DOM 更新完毕，防止拿不到根元素的高度
+        const data = this.flatten(this.data);
 
-      this.flattenedNodes = data;
-      this.filterFlattenedNodes();
+        this.flattenedNodes = data;
+        this.filterFlattenedNodes();
 
-      this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
-      this.setDOMRelated();
-      this.onScroll();
+        this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
+        this.setDOMRelated();
+        this.onScroll();
 
-      if (this.defaultCheckedKeys && this.defaultCheckedKeys.length) {
-        this.setCheckedKeys(this.defaultCheckedKeys);
-      }
+        if (this.defaultCheckedKeys && this.defaultCheckedKeys.length) {
+          this.setCheckedKeys(this.defaultCheckedKeys);
+        }
+      });
     },
 
     onScroll: throttle(function onScroll() {
@@ -284,6 +287,7 @@ export default {
     }),
 
     onResize() {
+      // 更新组件内属性，防止计算 index
       this.treeWrapperHeight = this.$refs.wrapper.clientHeight;
       this.onScroll();
     },

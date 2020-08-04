@@ -10,6 +10,8 @@
       default-expand-all
       :filter-node-method="filterNode"
       show-checkbox
+      @check="handleCheck"
+      @check-change="handleCheckChange"
     />
   </section>
 </template>
@@ -68,6 +70,12 @@ export default {
     filterNode(value, data) {
       if (!value) return true;
       return data.name.indexOf(value) !== -1;
+    },
+    handleCheck() {
+      console.log('check event--------');
+    },
+    handleCheckChange() {
+      console.log('check change event-----------');
     }
   }
 }

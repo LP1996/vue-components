@@ -7,6 +7,7 @@
       :data="treeData"
       height="90%"
       :props="props"
+      node-key="id"
       :load="handleLazyLoad"
       :filter-node-method="filterMethod"
       show-checkbox
