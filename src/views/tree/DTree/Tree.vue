@@ -5,7 +5,7 @@
       <div ref="nodesWrapper" class="d-tree-nodes">
         <div
           v-for="node in showData"
-          :key="node.key || node.label"
+          :key="node.key"
           class="d-tree-node"
           :class="{ selected: node.selected }"
           :style="treeNodeStyle"
@@ -185,13 +185,21 @@ export default {
     return {
       flattenedNodes: [],
       filteredNodes: [],
-      scrollTop: 0,
+
+      // 树根节点元素高度
       treeWrapperHeight: 0,
+
+      // 开始、结束渲染数据的 index
       startIndex: 0,
       endIndex: 0,
       selectedNode: null,
       isFiltering: false,
-      paddingNumber: 1
+
+      // 填充到本来要渲染的数据之前、之后的数据个数
+      paddingNumber: 1,
+
+      // 当没有传 node-key 时，使用该值作为元素的 key，防止 v-for 的 key 值重复
+      keyCount: 1
     }
   },
   computed: {
@@ -558,7 +566,7 @@ export default {
       const expanded = defaultExpandAll ? true : (nodeKey && defaultExpandedKeys ? defaultExpandedKeys.includes(originNode[nodeKey]) : false);
       const visible = level === 0 ? true : parent.expanded;
       // const checked = nodeKey ? (defaultCheckedKeys ? defaultCheckedKeys.includes(originNode[nodeKey]) : false) : false;
-      const key = nodeKey ? originNode[nodeKey] : null;
+      const key = nodeKey ? originNode[nodeKey] : this.keyCount++;
 
       const flattenedNode = {
         key,

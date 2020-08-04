@@ -4,9 +4,10 @@
     <el-tree
       ref="tree"
       style="width: 200px;"
-      :data="treeData"
+      :data="bigData"
       :props="treeProps"
       node-key="id"
+      default-expand-all
       :filter-node-method="filterNode"
       show-checkbox
     />
@@ -44,7 +45,7 @@ const bigData = [
   { id: 1, name: '0-1', children: [] }
 ];
 
-for (let i = 2; i < 100; i++) {
+for (let i = 2; i < 300; i++) {
   bigData[0].children.push({ id: i, name: `0-1-${i - 1}` });
 }
 
