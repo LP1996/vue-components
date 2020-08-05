@@ -647,6 +647,21 @@ export default {
         return;
       }
 
+      // 如果是空数组，则清除所有选中状态
+      if (!keys.length) {
+        this.traverseFlattenedNodes(flattenedNode => {
+          const oldChecked = flattenedNode.checked;
+          flattenedNode.checked = false;
+          flattenedNode.indeterminate = false;
+
+          // 触发事件
+          if (oldChecked !== flattenedNode.checked) {
+            this.triggerCheckRelateEvent(flattenedNode, false, true);
+          }
+        });
+        return;
+      }
+
       const keyMap = keys.reduce((map, key) => {
         map[key] = 1;
         return map;
