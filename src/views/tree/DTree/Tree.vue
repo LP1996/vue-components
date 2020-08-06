@@ -694,7 +694,8 @@ export default {
 
           if (keyMap[flattenedNode.key]) {
             // 如果有祖先节点的 key，则直接跳过，在祖先节点的 handleNodeCheckChange 中会处理该节点
-            if (hasParentKey) {
+            // 被过滤掉的节点不应该触发选中
+            if (hasParentKey || (this.filterCheckStrictly &&  this.isFiltering && !flattenedNode.filtered)) {
               return;
             }
 
