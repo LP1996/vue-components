@@ -39,7 +39,7 @@
             v-model="node.checked"
             :indeterminate="node.indeterminate"
             class="mr10"
-            @click.stop
+            @click.native.stop
             @change="handleNodeCheckChange(node, $event)"
           />
 
@@ -398,16 +398,23 @@ export default {
     handleNodeCheckChange(flattenedNode, checked, notTriggerCheckEvent) {
       flattenedNode.indeterminate = false;
 
+      // 只需要触发或者不触发当前节点的该事件，子孙节点、祖先节点因为没有被点击所以不用触发
+      this.triggerCheckRelateEvent(flattenedNode, checked, notTriggerCheckEvent);
+
       if (!this.checkStrictly) {
         // 只有在筛选的时候，并且是选中该节点，并且当前节点不是叶子节点的时候才走当前分支
         // 1. 如果是不选中该节点，则不用更具筛选判断父元素或者子元素状态，全部设置为 ckecked=false 即可
         // 2. 如果当前节点是叶子节点，则不用遍历子元素，更新祖先节点即可，所以走 else 分支
         if (this.isFiltering && this.filterCheckStrictly && checked && !flattenedNode.isLeaf) {
           this.traverseChildren(flattenedNode, chilNode => {
+            const oldChecked = chilNode.checked;
+            const oldIndeterminate = chilNode.indeterminate;
+
             // 如果节点是被筛选出来的
             if (chilNode.filtered) {
               chilNode.checked = checked;
               chilNode.indeterminate = false;
+              this.judgeTriggerCheckRelateEvent(chilNode, oldChecked, oldIndeterminate, true);
               return;
             }
 
@@ -417,16 +424,23 @@ export default {
             }
 
             this.traverseParent(chilNode, parentNode => {
+              const oldChecked = parentNode.checked;
+              const oldIndeterminate = parentNode.indeterminate;
               parentNode.checked = false;
               parentNode.indeterminate = true;
+              this.judgeTriggerCheckRelateEvent(parentNode, oldChecked, oldIndeterminate, true);
             });
           });
         } else {
           this.traverseChildren(
             flattenedNode,
             childNode => {
+              const oldChecked = childNode.checked;
+              const oldIndeterminate = childNode.indeterminate;
               childNode.checked = checked;
               childNode.indeterminate = false;
+
+              this.judgeTriggerCheckRelateEvent(childNode, oldChecked, oldIndeterminate, true);
             }
           );
   
@@ -436,14 +450,27 @@ export default {
               const isAllChecked = parentNode.children.every(({ checked }) => checked);
               const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
 
+              const oldChecked = parentNode.checked;
+              const oldIndeterminate = parentNode.indeterminate;
               parentNode.checked = isAllChecked;
               parentNode.indeterminate = hasChecked && !isAllChecked;
+
+              this.judgeTriggerCheckRelateEvent(parentNode, oldChecked, oldIndeterminate, true);
             }
           );
         }
       }
+    },
 
-      this.triggerCheckRelateEvent(flattenedNode, checked, notTriggerCheckEvent);
+    judgeTriggerCheckRelateEvent(flattenedNode, oldChecked, oldIndeterminate, notTriggerCheckEvent) {
+      const isCheckedChange = oldChecked !== flattenedNode.checked;
+      const isIndeterminateChange = oldIndeterminate !== flattenedNode.indeterminate;
+
+      if (isCheckedChange) {
+        this.triggerCheckRelateEvent(flattenedNode, flattenedNode.checked, notTriggerCheckEvent);
+      } else {
+        isIndeterminateChange && this.triggerCheckRelateEvent(flattenedNode, flattenedNode.checked, notTriggerCheckEvent);
+      }
     },
 
     triggerCheckRelateEvent(flattenedNode, checked, notTriggerCheckEvent) {
@@ -647,21 +674,6 @@ export default {
         return;
       }
 
-      // 如果是空数组，则清除所有选中状态
-      if (!keys.length) {
-        this.traverseFlattenedNodes(flattenedNode => {
-          const oldChecked = flattenedNode.checked;
-          flattenedNode.checked = false;
-          flattenedNode.indeterminate = false;
-
-          // 触发事件
-          if (oldChecked !== flattenedNode.checked) {
-            this.triggerCheckRelateEvent(flattenedNode, false, true);
-          }
-        });
-        return;
-      }
-
       const keyMap = keys.reduce((map, key) => {
         map[key] = 1;
         return map;
@@ -670,10 +682,38 @@ export default {
       this.traverseFlattenedNodes(flattenedNode => {
         const canSet = leafonly ? flattenedNode.isLeaf : true;
 
-        if (canSet && keyMap[flattenedNode.key]) {
-          flattenedNode.checked = true;
-          flattenedNode.indeterminate = false;
-          this.handleNodeCheckChange(flattenedNode, true, true);
+        if (canSet) {
+          let hasParentKey = false;
+
+          this.traverseParent(flattenedNode, parentNode => {
+            if (keyMap[parentNode.key]) {
+              hasParentKey = true;
+              return true;
+            }
+          });
+
+          if (keyMap[flattenedNode.key]) {
+            // 如果有祖先节点的 key，则直接跳过，在祖先节点的 handleNodeCheckChange 中会处理该节点
+            if (hasParentKey) {
+              return;
+            }
+
+            flattenedNode.checked = true;
+            flattenedNode.indeterminate = false;
+            this.handleNodeCheckChange(flattenedNode, true, true);
+          } else {
+            // 如果设置的 key 中有当前节点的祖先节点的 key，则跳过当前节点
+            if (hasParentKey) {
+              return;
+            }
+
+            const oldChecked = flattenedNode.checked;
+            const oldIndeterminate = flattenedNode.indeterminate;
+            flattenedNode.checked = false;
+            flattenedNode.indeterminate = false;
+
+            this.judgeTriggerCheckRelateEvent(flattenedNode, oldChecked, oldIndeterminate, true);
+          }
         }
       });
     },
@@ -848,6 +888,7 @@ export default {
 
         this.filterFlattenedNodes();
         this.setDOMRelated();
+        this.onScroll();
         return;
       }
 
@@ -872,6 +913,7 @@ export default {
 
       this.filterFlattenedNodes();
       this.setDOMRelated();
+      this.onScroll();
     },
 
     updateKeyChildren() {

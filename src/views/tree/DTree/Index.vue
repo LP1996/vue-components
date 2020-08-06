@@ -40,6 +40,86 @@ import DTree from './Tree.vue';
 // eslint-disable-next-line
 import data from './treeData';
 
+// eslint-disable-next-line
+const smallTreeData = [
+  {
+    id: 1,
+    name: '一级 1',
+    children: [
+      {
+        id: 2,
+        name: '二级 1-1',
+        children: [
+          {
+            id: 3,
+            name: '三级 1-1-1'
+          },
+          {
+            id: 15,
+            name: '三级 1-1-2'
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: 4,
+    name: '一级 2',
+    children: [
+      {
+        id: 5,
+        name: '二级 2-1',
+        children: [
+          {
+            id: 6,
+            name: '三级 2-1-1'
+          }
+        ]
+      },
+      {
+        id: 7,
+        name: '二级 2-2',
+        children: [
+          {
+            id: 8,
+            name: '三级 2-2-1'
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: 9,
+    name: '一级 3',
+    children: [
+      {
+        id: 10,
+        name: '二级 3-1',
+        children: [
+          {
+            id: 11,
+            name: '三级 3-1-1'
+          }
+        ]
+      },
+      {
+        id: 12,
+        name: '二级 3-2',
+        children: [
+          {
+            id: 13,
+            name: '三级 3-2-1'
+          },
+          {
+            id: 14,
+            name: '三级 3-2-2'
+          }
+        ]
+      }
+    ]
+  }
+];
+
 export default {
   name: 'DTreeTest',
   components: { DTree },
@@ -63,64 +143,8 @@ export default {
   },
   mounted() {
     setTimeout(() => {
-      this.treeData = data;
-      // this.treeData =  [
-      //   {
-      //     name: '一级 1',
-      //     children: [
-      //       {
-      //         name: '二级 1-1',
-      //         children: [
-      //           {
-      //             name: '三级 1-1-1'
-      //           }
-      //         ]
-      //       }
-      //     ]
-      //   },
-      //   {
-      //     name: '一级 2',
-      //     children: [
-      //       {
-      //         name: '二级 2-1',
-      //         children: [
-      //           {
-      //             name: '三级 2-1-1'
-      //           }
-      //         ]
-      //       },
-      //       {
-      //         name: '二级 2-2',
-      //         children: [
-      //           {
-      //             name: '三级 2-2-1'
-      //           }
-      //         ]
-      //       }
-      //     ]
-      //   },
-      //   {
-      //     name: '一级 3',
-      //     children: [
-      //       {
-      //         name: '二级 3-1',
-      //         children: [
-      //           {
-      //             name: '三级 3-1-1'
-      //           }
-      //         ]
-      //       },
-      //       {
-      //         name: '二级 3-2',
-      //         children: [
-      //           {
-      //             name: '三级 3-2-1'
-      //           }
-      //         ]
-      //       }
-      //     ]
-      //   }
-      // ];
+      // this.treeData = data;
+      this.treeData = smallTreeData;
     }, 1000);
   },
   methods: {
