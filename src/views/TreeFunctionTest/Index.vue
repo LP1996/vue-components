@@ -7,9 +7,10 @@
       :data="treeData"
       :props="treeProps"
       node-key="id"
-      default-expand-all
       :filter-node-method="filterNode"
+      :load="handleLoad"
       show-checkbox
+      lazy
       @check="handleCheck"
       @check-change="handleCheckChange"
     />
@@ -57,7 +58,8 @@ export default {
       treeData,
       bigData,
       treeProps: { label: 'name' },
-      filterText: ''
+      filterText: '',
+      lazyLoadCount: 10
     }
   },
   watch: {
@@ -75,6 +77,14 @@ export default {
     },
     handleCheckChange(data, chcked) {
       console.log('check change event-----------', data, chcked);
+    },
+    handleLoad(node, resolve) {
+      if (node.level === 0) {
+        return resolve(treeData);
+      }
+      setTimeout(() => {
+        resolve([{ id: this.lazyLoadCount++, name: 'lazy-' }]);
+      }, 500);
     }
   }
 }

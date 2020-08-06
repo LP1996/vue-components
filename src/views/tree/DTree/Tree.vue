@@ -349,7 +349,23 @@ export default {
         // 建立和当前 node 的联系，并且添加到组件的节点数组中
         flattenedNode.children = flattenedNodes;
         const index = this.flattenedNodes.findIndex(node => node === flattenedNode) + 1;
+
+        // 如果父元素是勾选状态，则需要勾选加载的数据，不需要触发 check 相关事件
+        if (!this.checkStrictly && flattenedNode.checked) {
+          flattenedNodes.forEach(childNode => (childNode.checked = true));
+        }
+
         this.flattenedNodes.splice(index, 0, ...flattenedNodes);
+
+        // 更新数据
+        this.filterFlattenedNodes();
+        this.setDOMRelated();
+        this.onScroll();
+
+        // 如果节点已经展开，则不做处理
+        if (flattenedNode.expanded) {
+          return;
+        }
 
         // 处理节点的展开收缩
         this.handleProcessNodeExpandOrCollapse(flattenedNode);

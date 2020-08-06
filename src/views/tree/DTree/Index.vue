@@ -12,7 +12,7 @@
       :filter-node-method="filterMethod"
       show-checkbox
       defaultExpandAll
-      filterCheckStrictly
+      lazy
       empty-text="就没数据了~"
       :defaultCheckedKeys="[285]"
       @check="handleCheckNode"
