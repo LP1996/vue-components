@@ -38,6 +38,7 @@
             v-if="showCheckbox"
             v-model="node.checked"
             :indeterminate="node.indeterminate"
+            :disabled="node.disabled"
             class="mr10"
             @click.native.stop
             @change="handleNodeCheckChange(node, $event)"
@@ -412,70 +413,84 @@ export default {
     },
 
     handleNodeCheckChange(flattenedNode, checked, notTriggerCheckEvent) {
-      flattenedNode.indeterminate = false;
+      // 如果节点被过滤了，并且设置了 filterCheckStrictly，则不用走后面的逻辑
+      if (this.isFiltering && this.filterCheckStrictly && checked && !flattenedNode.filtered) {
+        return;
+      }
+
+      // 勾选严格不相关，不需要后面处理子孙节点、祖先节点的逻辑
+      if (this.checkStrictly) {
+        flattenedNode.indeterminate = false;
+
+        // 只需要触发或者不触发当前节点的该事件，子孙节点、祖先节点因为没有被点击所以不用触发
+        this.triggerCheckRelateEvent(flattenedNode, flattenedNode.checked, notTriggerCheckEvent);
+        return;
+      }
+
+      // 如果节点时 disabled 状态，则只需要更新祖先节点状态
+      if (flattenedNode.disabled) {
+        this.traverseParent(
+          flattenedNode,
+          parentNode => {
+            const isAllChecked = parentNode.children.every(({ checked }) => checked);
+            const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
+
+            const oldChecked = parentNode.checked;
+            const oldIndeterminate = parentNode.indeterminate;
+            parentNode.checked = isAllChecked;
+            parentNode.indeterminate = hasChecked && !isAllChecked;
+
+            this.judgeTriggerCheckRelateEvent(parentNode, oldChecked, oldIndeterminate, true);
+          }
+        );
+        return;
+      }
+
+      // 非叶子节点根据直接子节点选中状态来去顶自身状态
+      if (!flattenedNode.isLeaf) {
+        const { allDisabled } = this.getDirectChildrenState(flattenedNode);
+
+        // 如果所有直接子节点都是禁用状态，则需要处理当前节点，并且跳过对子节点的处理
+        if (!allDisabled) {
+          const len = flattenedNode.children.length;
+          // 递归所有子节点
+          for (let i = 0; i < len; i++) {
+            this.handleNodeCheckChange(flattenedNode.children[i], checked, true);
+          }
+
+          const { allChecked, halfChecked } = this.getDirectChildrenState(flattenedNode);
+
+          flattenedNode.checked = allChecked;
+          flattenedNode.indeterminate = halfChecked;
+        }
+
+        const { allChecked, halfChecked } = this.getDirectChildrenState(flattenedNode);
+
+        flattenedNode.checked = allChecked;
+        flattenedNode.indeterminate = halfChecked;
+      } else {
+        // 叶子节点直接设置选中状态
+        flattenedNode.checked = checked;
+        flattenedNode.indeterminate = false;
+      }
+
+      this.traverseParent(
+        flattenedNode,
+        parentNode => {
+          const isAllChecked = parentNode.children.every(({ checked }) => checked);
+          const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
+
+          const oldChecked = parentNode.checked;
+          const oldIndeterminate = parentNode.indeterminate;
+          parentNode.checked = isAllChecked;
+          parentNode.indeterminate = hasChecked && !isAllChecked;
+
+          this.judgeTriggerCheckRelateEvent(parentNode, oldChecked, oldIndeterminate, true);
+        }
+      );
 
       // 只需要触发或者不触发当前节点的该事件，子孙节点、祖先节点因为没有被点击所以不用触发
-      this.triggerCheckRelateEvent(flattenedNode, checked, notTriggerCheckEvent);
-
-      if (!this.checkStrictly) {
-        // 只有在筛选的时候，并且是选中该节点，并且当前节点不是叶子节点的时候才走当前分支
-        // 1. 如果是不选中该节点，则不用更具筛选判断父元素或者子元素状态，全部设置为 ckecked=false 即可
-        // 2. 如果当前节点是叶子节点，则不用遍历子元素，更新祖先节点即可，所以走 else 分支
-        if (this.isFiltering && this.filterCheckStrictly && checked && !flattenedNode.isLeaf) {
-          this.traverseChildren(flattenedNode, chilNode => {
-            const oldChecked = chilNode.checked;
-            const oldIndeterminate = chilNode.indeterminate;
-
-            // 如果节点是被筛选出来的
-            if (chilNode.filtered) {
-              chilNode.checked = checked;
-              chilNode.indeterminate = false;
-              this.judgeTriggerCheckRelateEvent(chilNode, oldChecked, oldIndeterminate, true);
-              return;
-            }
-
-            // 筛选之前就选中的，并且被筛选出去的节点，不做处理
-            if (chilNode.checked) {
-              return;
-            }
-
-            this.traverseParent(chilNode, parentNode => {
-              const oldChecked = parentNode.checked;
-              const oldIndeterminate = parentNode.indeterminate;
-              parentNode.checked = false;
-              parentNode.indeterminate = true;
-              this.judgeTriggerCheckRelateEvent(parentNode, oldChecked, oldIndeterminate, true);
-            });
-          });
-        } else {
-          this.traverseChildren(
-            flattenedNode,
-            childNode => {
-              const oldChecked = childNode.checked;
-              const oldIndeterminate = childNode.indeterminate;
-              childNode.checked = checked;
-              childNode.indeterminate = false;
-
-              this.judgeTriggerCheckRelateEvent(childNode, oldChecked, oldIndeterminate, true);
-            }
-          );
-  
-          this.traverseParent(
-            flattenedNode,
-            parentNode => {
-              const isAllChecked = parentNode.children.every(({ checked }) => checked);
-              const hasChecked = parentNode.children.some(({ checked, indeterminate }) => checked || indeterminate);
-
-              const oldChecked = parentNode.checked;
-              const oldIndeterminate = parentNode.indeterminate;
-              parentNode.checked = isAllChecked;
-              parentNode.indeterminate = hasChecked && !isAllChecked;
-
-              this.judgeTriggerCheckRelateEvent(parentNode, oldChecked, oldIndeterminate, true);
-            }
-          );
-        }
-      }
+      this.triggerCheckRelateEvent(flattenedNode, flattenedNode.checked, notTriggerCheckEvent);
     },
 
     judgeTriggerCheckRelateEvent(flattenedNode, oldChecked, oldIndeterminate, notTriggerCheckEvent) {
@@ -529,7 +544,7 @@ export default {
 
       flattenedNode.children.forEach(childNode => {
         const val = fn(childNode);
-        !val && this.traverseChildren(childNode, fn)
+        !val && this.traverseChildren(childNode, fn);
       });
     },
 
@@ -554,6 +569,41 @@ export default {
           return;
         }
       }
+    },
+
+    getDirectChildrenState(flattenedNode) {
+      const state = {
+        allChecked: true,
+        noneChecked: true,
+        halfChecked: true,
+        allDisabled: true,
+        hasDisabled: true
+      };
+
+      if (!flattenedNode || !flattenedNode.children || flattenedNode.isLeaf) {
+        return state;
+      }
+
+      const len = flattenedNode.children.length;
+      let checkedCount = 0;
+      let disabledCount = 0;
+      let indeterminateCount = 0;
+
+      for (let i = 0; i < len; i++) {
+        const { checked, indeterminate, disabled } = flattenedNode.children[i];
+
+        checked && checkedCount++;
+        indeterminate && indeterminateCount++;
+        disabled && disabledCount++;
+      }
+
+      state.allChecked = checkedCount === len;
+      state.noneChecked = checkedCount === 0 && indeterminateCount === 0;
+      state.halfChecked = !state.allChecked && !state.noneChecked;
+      state.allDisabled = disabledCount === len;
+      state.hasDisabled = disabledCount !== 0;
+
+      return state;
     },
 
     // filter nodes
@@ -616,7 +666,6 @@ export default {
       const {
         defaultExpandAll,
         nodeKey,
-        // defaultCheckedKeys,
         defaultExpandedKeys,
         props: {
           label,
@@ -630,7 +679,6 @@ export default {
 
       const expanded = defaultExpandAll ? true : (nodeKey && defaultExpandedKeys ? defaultExpandedKeys.includes(originNode[nodeKey]) : false);
       const visible = level === 0 ? true : parent.expanded;
-      // const checked = nodeKey ? (defaultCheckedKeys ? defaultCheckedKeys.includes(originNode[nodeKey]) : false) : false;
       const key = nodeKey ? originNode[nodeKey] : this.keyCount++;
 
       const flattenedNode = {

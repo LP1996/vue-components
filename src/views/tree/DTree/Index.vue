@@ -12,7 +12,6 @@
       :filter-node-method="filterMethod"
       show-checkbox
       defaultExpandAll
-      lazy
       empty-text="就没数据了~"
       :defaultCheckedKeys="[285]"
       @check="handleCheckNode"
@@ -49,10 +48,12 @@ const smallTreeData = [
       {
         id: 2,
         name: '二级 1-1',
+        disabled: true,
         children: [
           {
             id: 3,
-            name: '三级 1-1-1'
+            name: '三级 1-1-1',
+            disabled: true
           },
           {
             id: 15,
@@ -131,7 +132,7 @@ export default {
         label: 'name',
         children: 'children',
         disabled(data) {
-          return data.id > 100;
+          return data.id > 100 && data.id < 1000;
         }
       }
     }
@@ -143,8 +144,8 @@ export default {
   },
   mounted() {
     setTimeout(() => {
-      // this.treeData = data;
-      this.treeData = smallTreeData;
+      this.treeData = data;
+      // this.treeData = smallTreeData;
     }, 1000);
   },
   methods: {
