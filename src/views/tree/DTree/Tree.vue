@@ -244,6 +244,12 @@ export default {
     // 当百分比高度 resize 时，需要重新计算 index
     window.addEventListener('resize', this.onResize, false);
   },
+  activated() {
+    // keep-alive 会保存组件状态，在重新激活时，更新根节点 scrollTop，防止未显示节点
+    if (this.startIndex !== 0) {
+      this.$refs.wrapper.scrollTop = this.startIndex * this.nodeHeight;
+    }
+  },
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize);
   },
