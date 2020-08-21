@@ -249,8 +249,12 @@ export default {
     if (this.startIndex !== 0) {
       this.$refs.wrapper.scrollTop = this.startIndex * this.nodeHeight;
     }
+    window.addEventListener('resize', this.onResize, false);
   },
   beforeDestroy() {
+    window.removeEventListener('resize', this.onResize);
+  },
+  deactivated() {
     window.removeEventListener('resize', this.onResize);
   },
   methods: {
